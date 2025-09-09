@@ -23,6 +23,7 @@ enum PricingType {
 class ProjectModel {
   final String? id;
   final String clientId;
+  final String? categoryId;
   final String projectName;
   final String description;
   final ProjectStatus status;
@@ -44,6 +45,7 @@ class ProjectModel {
   ProjectModel({
     this.id,
     required this.clientId,
+    this.categoryId,
     required this.projectName,
     required this.description,
     required this.status,
@@ -116,6 +118,7 @@ class ProjectModel {
     return ProjectModel(
       id: json['id'] as String?,
       clientId: json['client_id'] as String? ?? '',
+      categoryId: json['category_id'] as String?,
       projectName: json['project_name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       status: ProjectStatus.values.firstWhere(
@@ -166,6 +169,7 @@ class ProjectModel {
     return {
       if (id != null) 'id': id,
       'client_id': clientId,
+      'category_id': categoryId,
       'project_name': projectName,
       'description': description,
       'status': status.name,
@@ -186,6 +190,7 @@ class ProjectModel {
   ProjectModel copyWith({
     String? id,
     String? clientId,
+    String? categoryId,
     String? projectName,
     String? description,
     ProjectStatus? status,
@@ -205,6 +210,7 @@ class ProjectModel {
     return ProjectModel(
       id: id ?? this.id,
       clientId: clientId ?? this.clientId,
+      categoryId: categoryId ?? this.categoryId,
       projectName: projectName ?? this.projectName,
       description: description ?? this.description,
       status: status ?? this.status,

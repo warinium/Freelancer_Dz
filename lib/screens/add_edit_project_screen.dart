@@ -6,6 +6,7 @@ import '../models/project_model.dart';
 import '../models/client_model.dart';
 import '../services/project_service.dart';
 import '../services/client_service.dart';
+import '../services/project_category_service.dart';
 import '../utils/colors.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -29,7 +30,9 @@ class _AddEditProjectScreenState extends State<AddEditProjectScreen> {
   final _progressController = TextEditingController();
 
   List<ClientModel> _clients = [];
+  List<ProjectCategoryItem> _projectCategories = [];
   ClientModel? _selectedClient;
+  ProjectCategoryItem? _selectedProjectCategory;
   ProjectStatus _selectedStatus = ProjectStatus.notStarted;
   PricingType _selectedPricingType = PricingType.fixedPrice;
   Currency _selectedCurrency = Currency.da;
@@ -37,6 +40,7 @@ class _AddEditProjectScreenState extends State<AddEditProjectScreen> {
   DateTime? _endDate;
   bool _isLoading = false;
   bool _isLoadingClients = true;
+  bool _isLoadingCategories = true;
   bool get _isEditing => widget.project != null;
 
   // Enhanced UI/UX variables
@@ -54,6 +58,7 @@ class _AddEditProjectScreenState extends State<AddEditProjectScreen> {
   void initState() {
     super.initState();
     _loadClients();
+    _loadProjectCategories();
     if (_isEditing) {
       _populateFields();
     }
@@ -89,6 +94,28 @@ class _AddEditProjectScreenState extends State<AddEditProjectScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)?.errorLoadingClients(e)??'Error loading clients: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadProjectCategories() async {
+    try {
+      final categories = await ProjectCategoryService.getProjectCategories();
+      setState(() {
+        _projectCategories = categories;
+        _isLoadingCategories = false;
+      });
+
+      // After categories are loaded, populate fields if editing
+      if (_isEditing && _projectCategories.isNotEmpty) {
+        _setSelectedProjectCategoryForEditing();
+      }
+    } catch (e) {
+      setState(() => _isLoadingCategories = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading project categories: $e')),
         );
       }
     }
@@ -795,6 +822,84 @@ class _AddEditProjectScreenState extends State<AddEditProjectScreen> {
               validator: _validateDescription,
               maxLines: 4,
             ),
+
+            const SizedBox(height: 20),
+
+            // Project Category Selection
+            _isLoadingCategories
+                ? const Center(child: CircularProgressIndicator())
+                : _projectCategories.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.05),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              FontAwesomeIcons.triangleExclamation,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No project categories available. Please add categories in Settings > Project Categories.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          border: Border.all(
+                            color: _selectedProjectCategory != null
+                                ? AppColors.primary
+                                : AppColors.border,
+                            width: _selectedProjectCategory != null ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<ProjectCategoryItem>(
+                            value: _selectedProjectCategory,
+                            hint: Text(
+                              'Select project category',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            isExpanded: true,
+                            icon: const Icon(FontAwesomeIcons.chevronDown, size: 16),
+                            items: _projectCategories.map((category) {
+                              return DropdownMenuItem<ProjectCategoryItem>(
+                                value: category,
+                                child: Text(
+                                  category.name,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (ProjectCategoryItem? newValue) {
+                              setState(() {
+                                _selectedProjectCategory = newValue;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
 
             const SizedBox(height: 32),
 
@@ -1709,6 +1814,24 @@ class _AddEditProjectScreenState extends State<AddEditProjectScreen> {
         ),
       ),
     );
+  }
+
+  void _setSelectedProjectCategoryForEditing() {
+    if (widget.project != null && widget.project!.categoryId != null) {
+      try {
+        final category = _projectCategories.firstWhere(
+          (cat) => cat.id == widget.project!.categoryId,
+        );
+        setState(() {
+          _selectedProjectCategory = category;
+        });
+      } catch (e) {
+        // Category not found or null, keep _selectedProjectCategory as null
+        setState(() {
+          _selectedProjectCategory = null;
+        });
+      }
+    }
   }
 
   // Navigation Buttons

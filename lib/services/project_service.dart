@@ -214,6 +214,78 @@ class ProjectService {
     }
   }
 
+  // Filter projects by category
+  static Future<List<ProjectModel>> getProjectsByCategory(
+      String categoryId) async {
+    try {
+      if (_userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final projectsData = await _db.getProjectsByCategory(_userId!, categoryId);
+      final projects = <ProjectModel>[];
+
+      for (final projectData in projectsData) {
+        // Create a mutable copy of the project data
+        final mutableProjectData = Map<String, dynamic>.from(projectData);
+
+        // Get client data for each project
+        final clientData = await _db.getClientById(projectData['client_id']);
+        if (clientData != null) {
+          mutableProjectData['clients'] = clientData;
+        }
+        projects.add(ProjectModel.fromJson(mutableProjectData));
+      }
+
+      return projects;
+    } catch (e) {
+      throw Exception('Failed to fetch projects by category: $e');
+    }
+  }
+
+  // Get projects with category data
+  static Future<List<ProjectModel>> getProjectsWithCategory() async {
+    try {
+      if (_userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final projectsData = await _db.getProjects(_userId!);
+      final projects = <ProjectModel>[];
+
+      for (final projectData in projectsData) {
+        try {
+          // Create a mutable copy of the project data
+          final mutableProjectData = Map<String, dynamic>.from(projectData);
+
+          // Get client data for each project
+          final clientData = await _db.getClientById(projectData['client_id']);
+          if (clientData != null) {
+            mutableProjectData['clients'] = clientData;
+          }
+
+          // Get category data if category_id exists
+          if (projectData['category_id'] != null) {
+            final categoryData = await _db.getProjectCategoryById(projectData['category_id']);
+            if (categoryData != null) {
+              mutableProjectData['category'] = categoryData;
+            }
+          }
+
+          projects.add(ProjectModel.fromJson(mutableProjectData));
+        } catch (e) {
+          print('Error loading project data: $e');
+          // Continue with basic project data if category/client loading fails
+          projects.add(ProjectModel.fromJson(projectData));
+        }
+      }
+
+      return projects;
+    } catch (e) {
+      throw Exception('Failed to fetch projects with category: $e');
+    }
+  }
+
   // Get project count by client
   static Future<int> getProjectCountByClient(String clientId) async {
     try {

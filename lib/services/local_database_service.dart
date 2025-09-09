@@ -8,7 +8,7 @@ import 'dart:convert';
 class LocalDatabaseService {
   static Database? _database;
   static const String _databaseName = 'freelancer_mobile.db';
-  static const int _databaseVersion = 11;
+  static const int _databaseVersion = 12;
   static const _uuid = Uuid();
 
   // Table names
@@ -97,6 +97,7 @@ class LocalDatabaseService {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         client_id TEXT NOT NULL,
+        category_id TEXT,
         project_name TEXT NOT NULL,
         description TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('notStarted', 'inProgress', 'onHold', 'completed', 'cancelled')) DEFAULT 'notStarted',
@@ -112,7 +113,8 @@ class LocalDatabaseService {
         created_at TEXT NOT NULL,
         updated_at TEXT,
         FOREIGN KEY (user_id) REFERENCES $_usersTable (id) ON DELETE CASCADE,
-        FOREIGN KEY (client_id) REFERENCES $_clientsTable (id) ON DELETE CASCADE
+        FOREIGN KEY (client_id) REFERENCES $_clientsTable (id) ON DELETE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES $_expenseCategoriesTable (id) ON DELETE SET NULL
       )
     ''');
 
@@ -553,6 +555,60 @@ class LocalDatabaseService {
           FOREIGN KEY (user_id) REFERENCES $_usersTable (id) ON DELETE CASCADE
         )
       ''');
+    }
+
+    if (oldVersion < 12) {
+      // Add category_id column to projects table
+      try {
+        // Check if the column exists
+        final tableInfo =
+            await db.rawQuery('PRAGMA table_info($_projectsTable)');
+        final columnNames =
+            tableInfo.map((row) => row['name'] as String).toSet();
+
+        if (!columnNames.contains('category_id')) {
+          await db.execute(
+              'ALTER TABLE $_projectsTable ADD COLUMN category_id TEXT');
+        }
+      } catch (e) {
+        print('Error adding category_id column: $e');
+        // If there's an error, recreate the table
+        await db.execute('DROP TABLE IF EXISTS $_projectsTable');
+        await db.execute('''
+          CREATE TABLE $_projectsTable (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            client_id TEXT NOT NULL,
+            category_id TEXT,
+            project_name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('notStarted', 'inProgress', 'onHold', 'completed', 'cancelled')) DEFAULT 'notStarted',
+            pricing_type TEXT NOT NULL CHECK (pricing_type IN ('hourlyRate', 'fixedPrice')),
+            hourly_rate REAL,
+            fixed_amount REAL,
+            estimated_hours REAL,
+            actual_hours REAL,
+            currency TEXT NOT NULL CHECK (currency IN ('da', 'usd', 'eur')),
+            start_date TEXT,
+            end_date TEXT,
+            progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES $_usersTable (id) ON DELETE CASCADE,
+            FOREIGN KEY (client_id) REFERENCES $_clientsTable (id) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES $_expenseCategoriesTable (id) ON DELETE SET NULL
+          )
+        ''');
+
+        // Recreate indexes
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_user_id ON $_projectsTable (user_id)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_client_id ON $_projectsTable (client_id)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_status ON $_projectsTable (status)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_pricing_type ON $_projectsTable (pricing_type)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_created_at ON $_projectsTable (created_at)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_end_date ON $_projectsTable (end_date)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_projects_project_name ON $_projectsTable (project_name)');
+      }
     }
 
     if (oldVersion < 8) {
@@ -1017,6 +1073,73 @@ class LocalDatabaseService {
       toUpdate,
       where: 'id = ?',
       whereArgs: [categoryId],
+    );
+  }
+
+  // Project category methods (using expense_categories table for both)
+  Future<List<Map<String, dynamic>>> getProjectCategories(String userId) async {
+    final db = await database;
+    return await db.query(
+      _expenseCategoriesTable,
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<String> createProjectCategory(String userId, Map<String, dynamic> data) async {
+    final db = await database;
+    final id = generateId();
+    final now = getCurrentTimestamp();
+    final toInsert = Map<String, dynamic>.from(data);
+    toInsert['id'] = id;
+    toInsert['user_id'] = userId;
+    toInsert['created_at'] = now;
+
+    await db.insert(_expenseCategoriesTable, toInsert, conflictAlgorithm: ConflictAlgorithm.abort);
+    return id;
+  }
+
+  Future<Map<String, dynamic>?> getProjectCategoryById(String categoryId) async {
+    final db = await database;
+    final result = await db.query(
+      _expenseCategoriesTable,
+      where: 'id = ?',
+      whereArgs: [categoryId],
+      limit: 1,
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<void> deleteProjectCategory(String categoryId) async {
+    final db = await database;
+    await db.delete(
+      _expenseCategoriesTable,
+      where: 'id = ?',
+      whereArgs: [categoryId],
+    );
+  }
+
+  Future<void> updateProjectCategory(String categoryId, Map<String, dynamic> data) async {
+    final db = await database;
+    final toUpdate = Map<String, dynamic>.from(data);
+    toUpdate['updated_at'] = getCurrentTimestamp();
+    await db.update(
+      _expenseCategoriesTable,
+      toUpdate,
+      where: 'id = ?',
+      whereArgs: [categoryId],
+    );
+  }
+
+  // Get projects by category
+  Future<List<Map<String, dynamic>>> getProjectsByCategory(String userId, String categoryId) async {
+    final db = await database;
+    return await db.query(
+      _projectsTable,
+      where: 'user_id = ? AND category_id = ?',
+      whereArgs: [userId, categoryId],
+      orderBy: 'created_at DESC',
     );
   }
 }

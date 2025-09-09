@@ -326,23 +326,23 @@ class _MenuTabState extends State<MenuTab> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
-                size: 20,
+                size: 18,
                 color: color,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               title,
               style: GoogleFonts.poppins(
-                fontSize: AppConstants.textSmall,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
@@ -350,11 +350,11 @@ class _MenuTabState extends State<MenuTab> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               subtitle,
               style: GoogleFonts.poppins(
-                fontSize: 10,
+                fontSize: 9,
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,

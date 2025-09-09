@@ -22,6 +22,7 @@ import 'tax_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'data_settings_screen.dart';
 import 'category_settings_screen.dart';
+import 'project_category_settings_screen.dart';
 
 import '../l10n/app_localizations.dart';
 // import 'fiscal_year_management_screen.dart'; // Removed for now
@@ -190,6 +191,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const CategorySettingsScreen(),
+                ),
+              ),
+            ),
+            _buildDivider(),
+            _buildSettingsItem(
+              icon: FontAwesomeIcons.folder,
+              title: 'Project Categories',
+              subtitle: 'Manage project categories',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProjectCategorySettingsScreen(),
                 ),
               ),
             ),
